@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navigators</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+            font-family: sans-serif;
+        }
+
+        #loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 99999;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+
+        #loading-screen.fade-out {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        #loaderCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .loading-ui {
+            position: relative;
+            z-index: 10;
+            width: 80%;
+            max-width: 450px;
+            margin-bottom: 70px;
+            text-align: center;
+        }
+
+        .game-title {
+            font-size: 50px;
+            font-weight: normal;
+            color: #ffffff;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+
+        .status-text {
+            font-size: 16px;
+            color: #ffd700;
+            margin-bottom: 10px;
+        }
+
+        .progress-box {
+            width: 100%;
+            height: 12px;
+            background-color: rgb(50, 50, 50); 
+            border: 1px solid #ffffff;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #ff0000;
+            border-radius: 3px;
+            transition: width 0.1s linear;
+        }
+
+        .percentage {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading-screen">
+        <canvas id="loaderCanvas"></canvas>
+        <div class="loading-ui">
+            <h1 class="game-title">Navigators</h1>
+            <div class="status-text" id="statusText">Loading assets...</div>
+            <div class="progress-box">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+            <div class="percentage" id="percentageText">0%</div>
+        </div>
+    </div>
+
+    <script src="Ship.js"></script>
+    <script src="PlayerBullet.js"></script>
+    <script src="EnemyBullets.js"></script>
+    <script src="Enemies.js"></script>
+    <script src="Boss.js"></script>
+    <script src="Health Power.js"></script>
+    <script src="mySketch.js"></script>
+
+    <script>
+        (function() {
+            const canvas = document.getElementById('loaderCanvas');
+            const ctx = canvas.getContext('2d');
+            const statusText = document.getElementById('statusText');
+            const progressBar = document.getElementById('progressBar');
+            const percentageText = document.getElementById('percentageText');
+            const loadingScreen = document.getElementById('loading-screen');
+
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            const images = {};
+            const assetsToLoad = {
+                ship: 'ship.png',
+                enemy1: 'Enemy1.png',
+                enemy2: 'Enemy2.png',
+                enemy3: 'Enemy3.png',
+                boss: 'boss.png',
+                space: 'space.png'
+            };
+
+            for (let key in assetsToLoad) {
+                images[key] = new Image();
+                images[key].src = assetsToLoad[key];
+            }
+
+            let shipY = canvas.height / 2 - 50;
+            let shipDir = 1;
+            let lastShotTime = 0;
+
+            const bullets = [];
+            const enemies = [];
+            let boss = null;
+
+            const enemyKeys = ['enemy1', 'enemy2', 'enemy3'];
+
+            function spawnEnemy() {
+                const key = enemyKeys[Math.floor(Math.random() * enemyKeys.length)];
+                enemies.push({
+                    x: canvas.width,
+                    y: Math.random() * (canvas.height - 150),
+                    w: canvas.width / 30,
+                    h: canvas.height / 10,
+                    speed: 3 + Math.random() * 2,
+                    key: key,
+                    hp: 2,
+                    framesRed: 0
+                });
+            }
+
+            function updateSimulation() {
+                shipY += shipDir * (canvas.height / 180);
+                if (shipY <= 20 || shipY >= canvas.height - 120) {
+                    shipDir *= -1;
+                }
+
+                const now = Date.now();
+                if (now - lastShotTime > 180) {
+                    bullets.push({
+                        x: 10 + 50,
+                        y: shipY + 50,
+                        speed: 12
+                    });
+                    lastShotTime = now;
+                }
+
+                if (Math.random() < 0.035 && enemies.length < 5) {
+                    spawnEnemy();
+                }
+
+                if (!boss && Math.random() < 0.003) {
+                    boss = {
+                        x: canvas.width,
+                        y: canvas.height / 2 - 75,
+                        w: 150,
+                        h: 150,
+                        hp: 15,
+                        maxHp: 15
+                    };
+                }
+
+                const bulletW = canvas.width / 30;
+                const bulletH = canvas.height / 80;
+
+                for (let i = bullets.length - 1; i >= 0; i--) {
+                    const b = bullets[i];
+                    b.x += b.speed;
+
+                    for (let j = enemies.length - 1; j >= 0; j--) {
+                        const e = enemies[j];
+                        if (b.x >= e.x && b.x <= e.x + e.w && b.y >= e.y && b.y <= e.y + e.h) {
+                            e.hp--;
+                            e.framesRed = 3;
+                            bullets.splice(i, 1);
+                            if (e.hp <= 0) {
+                                enemies.splice(j, 1);
+                            }
+                            break;
+                        }
+                    }
+
+                    if (boss && b.x >= boss.x && b.x <= boss.x + boss.w && b.y >= boss.y && b.y <= boss.y + boss.h) {
+                        boss.hp--;
+                        bullets.splice(i, 1);
+                        if (boss.hp <= 0) {
+                            boss = null;
+                        }
+                    }
+
+                    if (b && b.x > canvas.width) {
+                        bullets.splice(i, 1);
+                    }
+                }
+
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    enemies[i].x -= enemies[i].speed;
+                    if (enemies[i].framesRed > 0) enemies[i].framesRed--;
+                    if (enemies[i].x < -100) enemies.splice(i, 1);
+                }
+
+                if (boss) {
+                    if (boss.x > canvas.width - 200) {
+                        boss.x -= 2;
+                    }
+                }
+            }
+
+            function renderSimulation() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                if (images.space.complete && images.space.naturalWidth !== 0) {
+                    ctx.drawImage(images.space, 0, 0, canvas.width, canvas.height);
+                }
+
+                const shipX = 10;
+                if (images.ship.complete && images.ship.naturalWidth !== 0) {
+                    ctx.strokeStyle = 'cyan';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.arc(shipX + 50, shipY + 50, 100 / 3.2, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    ctx.drawImage(images.ship, shipX, shipY, 100, 100);
+                }
+
+                const bulletW = canvas.width / 30;
+                const bulletH = canvas.height / 80;
+                ctx.fillStyle = 'red';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 1;
+                for (let b of bullets) {
+                    ctx.fillRect(b.x, b.y, bulletW, bulletH);
+                    ctx.strokeRect(b.x, b.y, bulletW, bulletH);
+                }
+
+                for (let e of enemies) {
+                    if (e.framesRed > 0) {
+                        ctx.fillStyle = 'red';
+                        ctx.fillRect(e.x, e.y, e.w, e.h);
+                    } else {
+                        const img = images[e.key];
+                        if (img && img.complete && img.naturalWidth !== 0) {
+                            if (e.hp > 1) {
+                                ctx.strokeStyle = 'cyan';
+                                ctx.lineWidth = 1;
+                                ctx.beginPath();
+                                ctx.arc(e.x + e.w / 2, e.y + e.h / 2, e.h / 3.2, 0, Math.PI * 2);
+                                ctx.stroke();
+                            }
+                            ctx.drawImage(img, e.x, e.y, e.w, e.h);
+                        }
+                    }
+                }
+
+                if (boss && images.boss.complete && images.boss.naturalWidth !== 0) {
+                    ctx.drawImage(images.boss, boss.x, boss.y, boss.w, boss.h);
+
+                    ctx.fillStyle = 'rgb(50,50,50)';
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1;
+                    ctx.fillRect(boss.x, boss.y - 20, boss.w, 10);
+                    ctx.strokeRect(boss.x, boss.y - 20, boss.w, 10);
+
+                    const currentWidth = (boss.hp / boss.maxHp) * boss.w;
+                    ctx.fillStyle = 'red';
+                    ctx.fillRect(boss.x, boss.y - 20, Math.max(0, currentWidth), 10);
+                }
+            }
+
+            function loop() {
+                updateSimulation();
+                renderSimulation();
+                requestAnimationFrame(loop);
+            }
+            loop();
+
+            let progress = 0;
+            let p5Loaded = false;
+
+            const statusMessages = [
+                "Loading assets...",
+                "Preparing weapons...",
+                "Scanning sectors...",
+                "Calibrating shield..."
+            ];
+
+            const originalSetup = window.setup;
+            window.setup = function() {
+                if (originalSetup) {
+                    originalSetup();
+                }
+                p5Loaded = true;
+            };
+
+            const progressInterval = setInterval(() => {
+                if (!p5Loaded) {
+                    if (progress < 90) progress += Math.random() * 5 + 2;
+                } else {
+                    progress += 10;
+                }
+
+                if (progress > 100) progress = 100;
+
+                const displayProgress = Math.floor(progress);
+                progressBar.style.width = displayProgress + '%';
+                percentageText.innerText = displayProgress + '%';
+
+                const msgIndex = Math.min(
+                    Math.floor((displayProgress / 100) * statusMessages.length),
+                    statusMessages.length - 1
+                );
+                statusText.innerText = statusMessages[msgIndex];
+
+                if (progress >= 100 && p5Loaded) {
+                    clearInterval(progressInterval);
+                    setTimeout(() => {
+                        loadingScreen.classList.add('fade-out');
+                    }, 300);
+                }
+            }, 60);
+
+        })();
+    </script>
+</body>
+</html>
