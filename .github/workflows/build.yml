@@ -5,7 +5,7 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,15 +17,12 @@ jobs:
           - os: windows-latest
             artifact_name: Navigators-Windows
             add_data: "web;web"
-            binary_name: Navigators.exe
           - os: ubuntu-latest
             artifact_name: Navigators-Linux
             add_data: "web:web"
-            binary_name: Navigators
           - os: macos-latest
             artifact_name: Navigators-macOS
             add_data: "web:web"
-            binary_name: Navigators
 
     steps:
       - name: Checkout Code
@@ -43,10 +40,10 @@ jobs:
 
       - name: Build Executable with PyInstaller
         run: |
-          pyinstaller --noconsole --onefile --add-data "${{ matrix.add_data }}" --name "Navigators" main.py
+          pyinstaller --noconsole --onedir --add-data "${{ matrix.add_data }}" --name "Navigators" main.py
 
       - name: Upload Build Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: dist/${{ matrix.binary_name }}
+          path: dist/Navigators
